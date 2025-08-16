@@ -30,6 +30,9 @@ dist/
 .DS_Store
 Thumbs.db
 
+# PowerShell scripts
+*.ps1
+
 # Logs
 *.log
 
