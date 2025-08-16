@@ -44,7 +44,8 @@ export const useDashboardData = (): DashboardData => {
 
       const token = localStorage.getItem('accessToken');
       if (!token) {
-        throw new Error('No access token found');
+        console.error('Dashboard: No access token found');
+        throw new Error('No access token found - please log in again');
       }
 
       // Fetch tasks to calculate stats
@@ -54,18 +55,29 @@ export const useDashboardData = (): DashboardData => {
         },
       });
 
+      if (tasksResponse.status === 401) {
+        // Token expired - redirect to login
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/login';
+        return;
+      }
+
       if (!tasksResponse.ok) {
-        throw new Error('Failed to fetch tasks');
+        const errorText = await tasksResponse.text();
+        console.error('Tasks API error:', tasksResponse.status, errorText);
+        throw new Error(`Failed to fetch tasks: ${tasksResponse.status} - ${errorText}`);
       }
 
       const tasks = await tasksResponse.json();
+      console.log('Dashboard: Fetched tasks:', tasks.length);
 
       // Calculate stats from tasks
       const now = new Date();
       const today = now.toDateString();
 
-      const completedTasks = tasks.filter((task: any) => task.status === 'completed').length;
-      const inProgressTasks = tasks.filter((task: any) => task.status === 'in-progress').length;
+      const completedTasks = tasks.filter((task: any) => task.status === 'COMPLETED').length;
+      const inProgressTasks = tasks.filter((task: any) => task.status === 'IN_PROGRESS').length;
       const dueTodayTasks = tasks.filter((task: any) => {
         if (!task.dueDate) return false;
         return new Date(task.dueDate).toDateString() === today;
@@ -74,7 +86,7 @@ export const useDashboardData = (): DashboardData => {
       // Calculate productivity (completed tasks in last 7 days / total tasks created in last 7 days)
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       const recentTasks = tasks.filter((task: any) => new Date(task.createdAt) > sevenDaysAgo);
-      const recentCompleted = recentTasks.filter((task: any) => task.status === 'completed').length;
+      const recentCompleted = recentTasks.filter((task: any) => task.status === 'COMPLETED').length;
       const productivity = recentTasks.length > 0 ? Math.round((recentCompleted / recentTasks.length) * 100) : 0;
 
       setStats({
@@ -84,12 +96,20 @@ export const useDashboardData = (): DashboardData => {
         productivity
       });
 
+      console.log('Dashboard stats calculated:', {
+        completedTasks,
+        inProgressTasks,
+        dueTodayTasks,
+        productivity,
+        totalTasks: tasks.length
+      });
+
       // Generate recent activity from tasks and projects
       const activityItems: RecentActivity[] = [];
 
       // Add recent task completions
       const recentCompletedTasks = tasks
-        .filter((task: any) => task.status === 'completed')
+        .filter((task: any) => task.status === 'COMPLETED')
         .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
         .slice(0, 3);
 
@@ -106,7 +126,7 @@ export const useDashboardData = (): DashboardData => {
 
       // Add recent task starts (in-progress)
       const recentStartedTasks = tasks
-        .filter((task: any) => task.status === 'in-progress')
+        .filter((task: any) => task.status === 'IN_PROGRESS')
         .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
         .slice(0, 2);
 
@@ -128,6 +148,14 @@ export const useDashboardData = (): DashboardData => {
             'Authorization': `Bearer ${token}`,
           },
         });
+
+        if (projectsResponse.status === 401) {
+          // Token expired - redirect to login
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/login';
+          return;
+        }
 
         if (projectsResponse.ok) {
           const projects = await projectsResponse.json();
