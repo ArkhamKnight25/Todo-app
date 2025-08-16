@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle, Clock, Calendar, TrendingUp, Plus, List, FolderOpen } from 'lucide-react'
+import { CheckCircle, Clock, Calendar, TrendingUp, Plus, List, FolderOpen, Home } from 'lucide-react'
 import TaskList from '../../components/tasks/TaskList'
 import { ProjectList } from '../../components/projects'
 import ThemeToggle from '../../components/ui/ThemeToggle'
+import { useDashboardData } from '../../lib/hooks/useDashboardData'
 
 type ViewMode = 'overview' | 'tasks' | 'projects'
 
@@ -14,6 +15,15 @@ export default function Dashboard() {
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentView, setCurrentView] = useState<ViewMode>('overview')
+  const { stats, recentActivity, loading: dashboardLoading, error: dashboardError, refresh } = useDashboardData()
+
+  const handleViewChange = (view: ViewMode) => {
+    setCurrentView(view)
+    // Refresh dashboard data when returning to overview
+    if (view === 'overview' && refresh) {
+      refresh()
+    }
+  }
 
   useEffect(() => {
     // Check authentication
@@ -49,17 +59,18 @@ export default function Dashboard() {
               {/* Navigation */}
               <nav className="flex space-x-4">
                 <button
-                  onClick={() => setCurrentView('overview')}
+                  onClick={() => handleViewChange('overview')}
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
                     currentView === 'overview'
                       ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                   }`}
                 >
+                  <Home className="h-4 w-4 mr-1 inline" />
                   Overview
                 </button>
                 <button
-                  onClick={() => setCurrentView('tasks')}
+                  onClick={() => handleViewChange('tasks')}
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
                     currentView === 'tasks'
                       ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
@@ -70,7 +81,7 @@ export default function Dashboard() {
                   Tasks
                 </button>
                 <button
-                  onClick={() => setCurrentView('projects')}
+                  onClick={() => handleViewChange('projects')}
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
                     currentView === 'projects'
                       ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
@@ -113,7 +124,9 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Completed Tasks</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">12</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                      {dashboardLoading ? '-' : stats.completedTasks}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -125,7 +138,9 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">In Progress</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">8</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                      {dashboardLoading ? '-' : stats.inProgressTasks}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -137,7 +152,9 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Due Today</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">3</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                      {dashboardLoading ? '-' : stats.dueTodayTasks}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -149,7 +166,9 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Productivity</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">85%</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                      {dashboardLoading ? '-' : `${stats.productivity}%`}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -160,14 +179,14 @@ export default function Dashboard() {
               <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <button 
-                  onClick={() => setCurrentView('tasks')}
+                  onClick={() => handleViewChange('tasks')}
                   className="flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
                 >
                   <Plus className="h-5 w-5 mr-2 text-gray-400" />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">New Task</span>
                 </button>
                 <button 
-                  onClick={() => setCurrentView('projects')}
+                  onClick={() => handleViewChange('projects')}
                   className="flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
                 >
                   <Plus className="h-5 w-5 mr-2 text-gray-400" />
@@ -187,35 +206,51 @@ export default function Dashboard() {
             {/* Recent Activity */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900/10 p-6 border dark:border-gray-700 transition-colors">
               <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Recent Activity</h2>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="flex-shrink-0">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-900 dark:text-gray-100">Task &ldquo;Design homepage&rdquo; completed</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">2 hours ago</p>
-                  </div>
+              
+              {dashboardError && (
+                <div className="text-center py-4">
+                  <p className="text-red-600 dark:text-red-400 text-sm">{dashboardError}</p>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="flex-shrink-0">
-                    <Clock className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-900 dark:text-gray-100">Task &ldquo;API integration&rdquo; started</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">4 hours ago</p>
-                  </div>
+              )}
+              
+              {dashboardLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center space-x-3 animate-pulse">
+                      <div className="w-5 h-5 bg-gray-200 dark:bg-gray-600 rounded-full"></div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-3/4 mb-1"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="flex-shrink-0">
-                    <Plus className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-900 dark:text-gray-100">New project &ldquo;Mobile App&rdquo; created</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Yesterday</p>
-                  </div>
+              ) : recentActivity.length > 0 ? (
+                <div className="space-y-4">
+                  {recentActivity.map((activity) => (
+                    <div key={activity.id} className="flex items-center space-x-3">
+                      <div className="flex-shrink-0">
+                        {activity.icon === 'check' && <CheckCircle className="h-5 w-5 text-green-600" />}
+                        {activity.icon === 'clock' && <Clock className="h-5 w-5 text-blue-600" />}
+                        {activity.icon === 'plus' && <Plus className="h-5 w-5 text-gray-600 dark:text-gray-400" />}
+                        {activity.icon === 'task' && <List className="h-5 w-5 text-orange-600" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-900 dark:text-gray-100">{activity.title}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{activity.description}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Clock className="mx-auto h-8 w-8 text-gray-400 dark:text-gray-500 mb-2" />
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">No recent activity</p>
+                  <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
+                    Start creating tasks and projects to see activity here
+                  </p>
+                </div>
+              )}
             </div>
           </>
         ) : currentView === 'tasks' ? (
