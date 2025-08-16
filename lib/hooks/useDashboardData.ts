@@ -59,7 +59,7 @@ export const useDashboardData = (): DashboardData => {
         // Token expired - redirect to login
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
+        window.location.href = '/login?expired=true';
         return;
       }
 
@@ -153,7 +153,7 @@ export const useDashboardData = (): DashboardData => {
           // Token expired - redirect to login
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
-          window.location.href = '/login';
+          window.location.href = '/login?expired=true';
           return;
         }
 

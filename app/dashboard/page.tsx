@@ -215,7 +215,7 @@ export default function Dashboard() {
                       Your session has expired. Please log in again to continue.
                     </p>
                     <button
-                      onClick={() => window.location.href = '/login'}
+                      onClick={() => window.location.href = '/login?expired=true'}
                       className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium"
                     >
                       Go to Login
