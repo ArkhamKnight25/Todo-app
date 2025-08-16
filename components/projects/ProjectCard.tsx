@@ -30,7 +30,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer group"
+      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg dark:hover:shadow-gray-900/20 transition-all cursor-pointer group"
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
@@ -40,10 +40,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
             style={{ backgroundColor: project.color }}
           />
           <div>
-            <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
               {project.name}
             </h3>
-            <p className="text-sm text-gray-500">{project.workspaceName}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{project.workspaceName}</p>
           </div>
         </div>
         {project.icon && (
@@ -53,13 +53,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
 
       {/* Description */}
       {project.description && (
-        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+        <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">
           {project.description}
         </p>
       )}
 
       {/* Stats */}
-      <div className="flex items-center justify-between text-sm text-gray-500">
+      <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
         <div className="flex items-center space-x-4">
           <span className="flex items-center space-x-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,7 +81,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
 
       {/* Progress indicator */}
       <div className="mt-4">
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
           <div
             className="h-2 rounded-full transition-all duration-300"
             style={{

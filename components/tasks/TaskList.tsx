@@ -131,10 +131,10 @@ export default function TaskList() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <div className="text-red-600 mb-4">Error: {error}</div>
+        <div className="text-red-600 dark:text-red-400 mb-4">Error: {error}</div>
         <button
           onClick={() => fetchTasks()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600"
         >
           Retry
         </button>
@@ -147,15 +147,15 @@ export default function TaskList() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
-          <p className="text-gray-600">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Tasks</h1>
+          <p className="text-gray-600 dark:text-gray-400">
             {filteredTasks.length} of {tasks.length} tasks
           </p>
         </div>
         
         <button
           onClick={handleCreateTask}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
         >
           <Plus className="h-4 w-4 mr-2" />
           New Task
@@ -166,13 +166,13 @@ export default function TaskList() {
       <div className="flex flex-col sm:flex-row gap-4">
         {/* Search */}
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             placeholder="Search tasks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
           />
         </div>
         
@@ -181,7 +181,7 @@ export default function TaskList() {
           <select
             value={filterBy}
             onChange={(e) => setFilterBy(e.target.value as FilterBy)}
-            className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-gray-100"
           >
             <option value="all">All Tasks ({taskCounts.all})</option>
             <option value="today">Due Today ({taskCounts.today})</option>
@@ -189,7 +189,7 @@ export default function TaskList() {
             <option value="completed">Completed ({taskCounts.completed})</option>
             <option value="my-tasks">My Tasks ({taskCounts['my-tasks']})</option>
           </select>
-          <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
         </div>
         
         {/* Sort Dropdown */}
@@ -197,7 +197,7 @@ export default function TaskList() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortBy)}
-            className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-gray-100"
           >
             <option value="created">Sort by Created</option>
             <option value="due-date">Sort by Due Date</option>
@@ -211,7 +211,7 @@ export default function TaskList() {
       {/* Task List */}
       {filteredTasks.length === 0 ? (
         <div className="text-center py-12">
-          <div className="text-gray-500 mb-4">
+          <div className="text-gray-500 dark:text-gray-400 mb-4">
             {searchQuery || filterBy !== 'all' 
               ? 'No tasks match your criteria' 
               : 'No tasks yet'
@@ -220,7 +220,7 @@ export default function TaskList() {
           {!searchQuery && filterBy === 'all' && (
             <button
               onClick={handleCreateTask}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600"
             >
               Create your first task
             </button>

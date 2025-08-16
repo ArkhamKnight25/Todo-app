@@ -20,10 +20,10 @@ export default function TaskItem({ task, onComplete, onEdit }: TaskItemProps) {
   const subtasksTotal = task.subtasks.length
   
   const priorityColors = {
-    LOW: 'bg-blue-100 text-blue-800 border-blue-200',
-    MEDIUM: 'bg-gray-100 text-gray-800 border-gray-200',
-    HIGH: 'bg-orange-100 text-orange-800 border-orange-200',
-    URGENT: 'bg-red-100 text-red-800 border-red-200',
+    LOW: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-700',
+    MEDIUM: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-600',
+    HIGH: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700',
+    URGENT: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-700',
   }
   
   const statusColors = {
@@ -41,7 +41,7 @@ export default function TaskItem({ task, onComplete, onEdit }: TaskItemProps) {
   
   return (
     <div
-      className={`group relative bg-white border rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer border-l-4 ${statusColors[task.status]} ${isCompleted ? 'opacity-75' : ''}`}
+      className={`group relative bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg p-4 hover:shadow-md dark:hover:shadow-gray-900/20 transition-all duration-200 cursor-pointer border-l-4 ${statusColors[task.status]} ${isCompleted ? 'opacity-75' : ''}`}
       onClick={() => onEdit(task)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -55,7 +55,7 @@ export default function TaskItem({ task, onComplete, onEdit }: TaskItemProps) {
           {isCompleted ? (
             <CheckCircle className="h-5 w-5 text-green-500" />
           ) : (
-            <Circle className="h-5 w-5 text-gray-300 hover:text-gray-500" />
+            <Circle className="h-5 w-5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400" />
           )}
         </button>
         
@@ -63,7 +63,7 @@ export default function TaskItem({ task, onComplete, onEdit }: TaskItemProps) {
         <div className="flex-1 min-w-0">
           {/* Title and Priority */}
           <div className="flex items-start justify-between mb-2">
-            <h3 className={`font-medium text-gray-900 ${isCompleted ? 'line-through' : ''}`}>
+            <h3 className={`font-medium text-gray-900 dark:text-gray-100 ${isCompleted ? 'line-through' : ''}`}>
               {task.title}
             </h3>
             
@@ -77,7 +77,7 @@ export default function TaskItem({ task, onComplete, onEdit }: TaskItemProps) {
           
           {/* Description */}
           {task.description && (
-            <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2 line-clamp-2">
               {task.description}
             </p>
           )}
@@ -88,12 +88,12 @@ export default function TaskItem({ task, onComplete, onEdit }: TaskItemProps) {
               className="w-3 h-3 rounded-full mr-2"
               style={{ backgroundColor: task.project.color }}
             />
-            <span className="text-sm text-gray-600">{task.project.name}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{task.project.name}</span>
           </div>
           
           {/* Meta Information */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3 text-sm text-gray-500">
+            <div className="flex items-center space-x-3 text-sm text-gray-500 dark:text-gray-400">
               {/* Due Date */}
               {task.dueDate && (
                 <span className="flex items-center">
@@ -131,7 +131,7 @@ export default function TaskItem({ task, onComplete, onEdit }: TaskItemProps) {
             <div className="flex items-center space-x-2">
               {task.assignee && (
                 <div className="flex items-center">
-                  <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                  <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden">
                     {task.assignee.avatar ? (
                       <Image 
                         src={task.assignee.avatar} 
@@ -141,7 +141,7 @@ export default function TaskItem({ task, onComplete, onEdit }: TaskItemProps) {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="text-xs font-medium text-gray-600">
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
                         {task.assignee.name?.charAt(0) || '?'}
                       </span>
                     )}
@@ -156,9 +156,9 @@ export default function TaskItem({ task, onComplete, onEdit }: TaskItemProps) {
                     e.stopPropagation()
                     // TODO: Show context menu
                   }}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 transition-all"
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
                 >
-                  <MoreVertical className="h-4 w-4 text-gray-400" />
+                  <MoreVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                 </button>
               )}
             </div>

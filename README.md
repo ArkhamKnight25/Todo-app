@@ -2,30 +2,37 @@
 
 A modern, full-stack todo application built with Next.js 14+, TypeScript, Tailwind CSS, and PostgreSQL. Inspired by Asana's design philosophy with enterprise-grade features.
 
+🌐 **Live Demo**: [https://todo-god.vercel.app](https://todo-god.vercel.app)
+
 ## 🚀 Features
 
 ### ✅ Implemented
 - **Authentication System**: JWT-based auth with registration and login
+- **Project Management**: Complete CRUD operations for projects with workspace support
 - **Database Schema**: Complete Prisma schema with PostgreSQL
 - **Modern UI**: Tailwind CSS with responsive design
 - **TypeScript**: Full type safety throughout the application
+- **Production Deployment**: Deployed on Vercel with custom domain
+- **API Integration**: RESTful APIs for projects, tasks, and sections
 
 ### 🚧 In Development
 - Task management with CRUD operations
-- Project and workspace management
 - Real-time collaboration
 - Kanban board view
 - Calendar integration
 - Dashboard with analytics
+- Dark mode theme
 
 ## 🛠 Tech Stack
 
 - **Frontend**: Next.js 14+ (App Router), React, TypeScript
 - **Styling**: Tailwind CSS
-- **Database**: PostgreSQL with Prisma ORM
+- **Database**: Neon PostgreSQL v17 with Prisma ORM
 - **Authentication**: JWT with bcrypt
 - **Validation**: Zod
 - **UI Components**: Custom components with Lucide icons
+- **Deployment**: Vercel with custom domain
+- **State Management**: Zustand for client-side state
 
 ## 📦 Installation
 
@@ -109,36 +116,58 @@ The application uses a comprehensive schema including:
 
 ## 🚀 Deployment
 
-### Vercel (Recommended)
-1. Connect your GitHub repository to Vercel
-2. Set environment variables in Vercel dashboard
-3. Deploy automatically on push to main branch
+### Live Application
+- **URL**: [https://todo-god.vercel.app](https://todo-god.vercel.app)
+- **Platform**: Vercel with automatic deployments
+- **Custom Domain**: Configured with Vercel alias system
+
+### Deployment Process
+1. **GitHub Integration**: Connected repository for automatic deployments
+2. **Build Configuration**: Custom build script with Prisma generation
+3. **Environment Variables**: Production environment configured
+4. **Domain Aliasing**: `vercel alias [deployment-url] todo-god.vercel.app`
 
 ### Environment Variables for Production
 ```env
-DATABASE_URL="your-production-database-url"
-DATABASE_URL_UNPOOLED="your-unpooled-database-url"
+DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
 JWT_SECRET="your-production-jwt-secret"
 JWT_REFRESH_SECRET="your-production-refresh-secret"
-NEXTAUTH_URL="https://your-domain.com"
+NEXTAUTH_URL="https://todo-god.vercel.app"
 NEXTAUTH_SECRET="your-nextauth-secret"
+NODE_ENV="production"
+```
+
+### Build Script
+```json
+{
+  "scripts": {
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate"
+  }
+}
 ```
 
 ## 📱 Development Roadmap
 
 ### Phase 1: Foundation ✅
 - [x] Next.js project setup
-- [x] Authentication system
+- [x] Authentication system  
 - [x] Database schema
 - [x] Basic UI components
+- [x] Production deployment
+- [x] Custom domain setup
 
-### Phase 2: Core Features (In Progress)
-- [ ] Task CRUD operations
-- [ ] Project management
-- [ ] Dashboard with stats
-- [ ] List and board views
+### Phase 2: Core Features ✅ 
+- [x] Project CRUD operations
+- [x] Project management API
+- [x] Dashboard with navigation
+- [x] Project cards and list views
+- [x] Workspace integration
+- [ ] Task CRUD operations (In Progress)
+- [ ] Kanban board implementation
 
-### Phase 3: Advanced Features
+### Phase 3: Advanced Features (Planned)
+- [ ] Dark mode theme
 - [ ] Real-time collaboration
 - [ ] Calendar integration
 - [ ] File attachments
