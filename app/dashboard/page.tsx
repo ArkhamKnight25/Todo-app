@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle, Clock, Calendar, TrendingUp, Plus, List } from 'lucide-react'
+import { CheckCircle, Clock, Calendar, TrendingUp, Plus, List, FolderOpen } from 'lucide-react'
 import TaskList from '../../components/tasks/TaskList'
+import { ProjectList } from '../../components/projects'
 
-type ViewMode = 'overview' | 'tasks'
+type ViewMode = 'overview' | 'tasks' | 'projects'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -66,6 +67,17 @@ export default function Dashboard() {
                 >
                   <List className="h-4 w-4 mr-1 inline" />
                   Tasks
+                </button>
+                <button
+                  onClick={() => setCurrentView('projects')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    currentView === 'projects'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <FolderOpen className="h-4 w-4 mr-1 inline" />
+                  Projects
                 </button>
               </nav>
             </div>
@@ -152,7 +164,10 @@ export default function Dashboard() {
                   <Plus className="h-5 w-5 mr-2 text-gray-400" />
                   <span className="text-sm font-medium text-gray-700">New Task</span>
                 </button>
-                <button className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                <button 
+                  onClick={() => setCurrentView('projects')}
+                  className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
                   <Plus className="h-5 w-5 mr-2 text-gray-400" />
                   <span className="text-sm font-medium text-gray-700">New Project</span>
                 </button>
@@ -201,9 +216,12 @@ export default function Dashboard() {
               </div>
             </div>
           </>
-        ) : (
+        ) : currentView === 'tasks' ? (
           /* Task Management View */
           <TaskList />
+        ) : (
+          /* Projects View */
+          <ProjectList />
         )}
       </main>
     </div>
