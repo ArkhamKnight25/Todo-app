@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Project, Section, Task } from '@/types';
 
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';import TaskModal from '@/components/tasks/TaskModal';
 interface ProjectBoardProps {
   projectId: string;
 }
@@ -11,9 +12,20 @@ interface ProjectBoardProps {
 const ProjectBoard: React.FC<ProjectBoardProps> = ({ projectId }) => {
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
-  const [sections, setSections] = useState<Section[]>([]);
+  const [sections, setSections] = useState<Section[]>([]); // Keep for possible future use
+  const [newSectionName, setNewSectionName] = useState(''); // Keep for possible future use
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  if (!isHydrated) return null;
 
   useEffect(() => {
     fetchProject();
@@ -25,8 +37,15 @@ const ProjectBoard: React.FC<ProjectBoardProps> = ({ projectId }) => {
       setError(null);
 
       const token = localStorage.getItem('accessToken');
+      console.log('DEBUG: token', token);
+      console.log('DEBUG: projectId', projectId);
       if (!token) {
         router.push('/login');
+        return;
+      }
+      if (!projectId || typeof projectId !== 'string' || projectId.trim() === '') {
+        setError('Invalid project ID');
+        setLoading(false);
         return;
       }
 
@@ -38,14 +57,29 @@ const ProjectBoard: React.FC<ProjectBoardProps> = ({ projectId }) => {
         },
       });
 
+      if (projectResponse.status === 401) {
+        // Token invalid or expired
+        localStorage.removeItem('accessToken');
+        router.push('/login');
+        return;
+      }
+
       if (!projectResponse.ok) {
-        throw new Error('Failed to fetch project');
+        let errorMsg = 'Failed to fetch project';
+        try {
+          const errorData = await projectResponse.json();
+          errorMsg = errorData.error || errorMsg;
+        } catch {}
+        setError(errorMsg);
+        setLoading(false);
+        return;
       }
 
       const projectData = await projectResponse.json();
       setProject(projectData.project);
 
-      // Fetch sections
+
+      // Fetch sections (with tasks)
       const sectionsResponse = await fetch(`/api/projects/${projectId}/sections`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -59,6 +93,20 @@ const ProjectBoard: React.FC<ProjectBoardProps> = ({ projectId }) => {
 
       const sectionsData = await sectionsResponse.json();
       setSections(sectionsData.sections || []);
+
+      // Gather all tasks from sections
+      const allTasks: Task[] = [];
+      sectionsData.sections?.forEach((section: Section) => {
+        section.tasks?.forEach((task: Task) => {
+          allTasks.push(task);
+        });
+      });
+      setTasks(allTasks);
+
+
+
+
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch project');
     } finally {
@@ -98,7 +146,97 @@ const ProjectBoard: React.FC<ProjectBoardProps> = ({ projectId }) => {
     }
   };
 
+
+  const onDragEnd = async (result: any) => {
+    const { destination, source, draggableId } = result;
+
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+    setDraggedTaskId(draggableId);
+    const taskId = draggableId;
+    const sourceStatus = source.droppableId;
+    const destStatus = destination.droppableId;
+
+    const originalTasks = [...tasks];
+
+    try {
+      // If moving within the same status column, reorder
+      if (sourceStatus === destStatus) {
+        const statusTasks = tasks.filter((task) => task.status === sourceStatus);
+        const otherTasks = tasks.filter((task) => task.status !== sourceStatus);
+        const movedTask = statusTasks[source.index];
+        const newStatusTasks = Array.from(statusTasks);
+        newStatusTasks.splice(source.index, 1);
+        newStatusTasks.splice(destination.index, 0, movedTask);
+        setTasks([...otherTasks, ...newStatusTasks]);
+      } else {
+        // If moving to a different status, update status and move to new column
+        setTasks((prevTasks) => {
+          const updatedTasks = prevTasks.map((task) =>
+            task.id === taskId ? { ...task, status: destStatus } : task
+          );
+          // Reorder in new column
+          const destTasks = updatedTasks.filter((task) => task.status === destStatus);
+          const otherTasks = updatedTasks.filter((task) => task.status !== destStatus);
+          const movedTask = updatedTasks.find((task) => task.id === taskId);
+          let newDestTasks = Array.from(destTasks);
+          // Remove the moved task from its old position if present
+          newDestTasks = newDestTasks.filter((task) => task.id !== taskId);
+          // Insert at the new index
+          if (movedTask) newDestTasks.splice(destination.index, 0, movedTask);
+          return [...otherTasks, ...newDestTasks];
+        });
+      }
+    } catch (error) {
+      console.error("Failed to reorder tasks:", error);
+      setTasks(originalTasks);
+      setError("Failed to reorder tasks. Reverting changes.");
+    } finally {
+      setDraggedTaskId(null);
+      // Optionally, persist order to backend here
+    }
+  };
+
+  const handleCreateSection = async () => {
+    if (!newSectionName.trim()) {
+      alert("Section name cannot be empty");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch(`/api/projects/${projectId}/sections`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: newSectionName }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create section');
+      }
+      setNewSectionName('');
+      fetchProject(); // Refresh project data
+    } catch (error) {
+      console.error("Section creation error:", error);
+      setError("Failed to create section.");
+    }
+  };
+
+  const handleAddTaskClick = () => {
+    setIsAddTaskModalOpen(true);
+  };
+
   if (loading) {
+    if (!isHydrated) return null;
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -106,7 +244,9 @@ const ProjectBoard: React.FC<ProjectBoardProps> = ({ projectId }) => {
     );
   }
 
+
   if (error) {
+    if (!isHydrated) return null;
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <div className="flex">
@@ -128,6 +268,7 @@ const ProjectBoard: React.FC<ProjectBoardProps> = ({ projectId }) => {
   }
 
   if (!project) {
+    if (!isHydrated) return null;
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">Project not found</p>
@@ -135,127 +276,153 @@ const ProjectBoard: React.FC<ProjectBoardProps> = ({ projectId }) => {
     );
   }
 
+
+
   return (
-    <div className="space-y-6">
-      {/* Project Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div
-            className="w-4 h-4 rounded-full"
-            style={{ backgroundColor: project.color }}
-          />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
-            {project.description && (
-              <p className="text-gray-600">{project.description}</p>
-            )}
-          </div>
-          {project.icon && (
-            <span className="text-2xl">{project.icon}</span>
-          )}
-        </div>
-        <div className="flex items-center space-x-2">
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-            Add Task
-          </button>
-        </div>
-      </div>
-
-      {/* Kanban Board */}
-      <div className="flex space-x-6 overflow-x-auto pb-6">
-        {sections.map((section) => (
-          <div key={section.id} className="flex-shrink-0 w-80">
-            <div className="bg-gray-50 rounded-lg p-4">
-              {/* Section Header */}
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">{section.name}</h3>
-                <span className="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full">
-                  {section._count?.tasks || 0}
-                </span>
+    return (
+      <>
+        <div className="space-y-6 relative">
+          {/* Project Header */}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div
+                className="w-4 h-4 rounded-full"
+                style={{ backgroundColor: project.color }}
+              />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
+                {project.description && (
+                  <p className="text-gray-600">{project.description}</p>
+                )}
               </div>
-
-              {/* Tasks */}
-              <div className="space-y-3">
-                {section.tasks?.map((task) => (
-                  <div
-                    key={task.id}
-                    className={`bg-white rounded-lg p-3 border-l-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getPriorityColor(task.priority)}`}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-medium text-gray-900 text-sm">{task.title}</h4>
-                      <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadgeColor(task.status)}`}>
-                        {task.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                    
-                    {task.description && (
-                      <p className="text-gray-600 text-xs mb-2 line-clamp-2">{task.description}</p>
-                    )}
-
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <div className="flex items-center space-x-2">
-                        {task.assignee && (
-                          <div className="flex items-center space-x-1">
-                            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">
-                              {task.assignee.name?.[0] || task.assignee.email[0]}
+              {project.icon && (
+                <span className="text-2xl">{project.icon}</span>
+              )}
+            </div>
+            <div className="flex items-center space-x-2">
+              <button onClick={handleAddTaskClick} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                Add Task
+              </button>
+            </div>
+          </div>
+          {/* Group tasks by status */}
+          <DragDropContext onDragEnd={onDragEnd}>
+            <div className="flex space-x-6 overflow-x-auto pb-6">
+              {['TODO', 'IN_PROGRESS', 'REVIEW', 'COMPLETED', 'ARCHIVED'].map((status) => {
+                const statusTasks = tasks
+                  .filter((task) => task.status === status)
+                  .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                return (
+                  <div key={status} className="flex-shrink-0 w-80">
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                      {/* Status Header */}
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{status.replace('_', ' ')}</h3>
+                        <span className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-2 py-1 rounded-full">
+                          {statusTasks.length}
+                        </span>
+                      </div>
+                      {/* Tasks for this status */}
+                      <Droppable droppableId={status}>
+                        {(provided) => {
+                          // Use default parameters instead of defaultProps
+                          return (
+                            <div className="space-y-3" ref={provided.innerRef} {...provided.droppableProps}>
+                              {statusTasks.map((task, index) => (
+                                <Draggable key={task.id} draggableId={task.id} index={index}>
+                                  {(provided) => {
+                                    // Use default parameters instead of defaultProps
+                                    return (
+                                      <div
+                                        key={task.id}
+                                        ref={provided.innerRef}
+                                        {...provided.draggableProps}
+                                        {...provided.dragHandleProps}
+                                        className={`bg-white dark:bg-gray-900 rounded-lg p-3 border-l-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer
+                                          ${getPriorityColor(task.priority)}
+                                          ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
+                                      >
+                                        <div className="flex items-start justify-between mb-2">
+                                          <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm">{task.title}</h4>
+                                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadgeColor(task.status)} dark:text-gray-100`}>
+                                            {task.status.replace('_', ' ')}
+                                          </span>
+                                        </div>
+                                        {task.description && (
+                                          <p className="text-gray-600 dark:text-gray-300 text-xs mb-2 line-clamp-2">{task.description}</p>
+                                        )}
+                                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                          <div className="flex items-center space-x-2">
+                                            {task.assignee && (
+                                              <div className="flex items-center space-x-1">
+                                                <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">
+                                                  {task.assignee.name?.[0] || task.assignee.email[0]}
+                                                </div>
+                                              </div>
+                                            )}
+                                            {task.dueDate && (
+                                              <span>
+                                                Due {new Date(task.dueDate).toLocaleDateString()}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center space-x-1">
+                                            {task._count && (
+                                              <>
+                                                {task._count.comments > 0 && (
+                                                  <span className="flex items-center space-x-1">
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                    </svg>
+                                                    <span>{task._count.comments}</span>
+                                                  </span>
+                                                )}
+                                                {task._count.attachments > 0 && (
+                                                  <span className="flex items-center space-x-1">
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                    </svg>
+                                                    <span>{task._count.attachments}</span>
+                                                  </span>
+                                                )}
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  }}
+                                </Draggable>
+                              ))}
+                              {/* Add Task to Status */}
+                              <button onClick={handleAddTaskClick} className="w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors text-sm">
+                                + Add Task
+                              </button>
+                              {provided.placeholder}
                             </div>
-                          </div>
-                        )}
-                        {task.dueDate && (
-                          <span>
-                            Due {new Date(task.dueDate).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        {task._count && (
-                          <>
-                            {task._count.comments > 0 && (
-                              <span className="flex items-center space-x-1">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                </svg>
-                                <span>{task._count.comments}</span>
-                              </span>
-                            )}
-                            {task._count.attachments > 0 && (
-                              <span className="flex items-center space-x-1">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                </svg>
-                                <span>{task._count.attachments}</span>
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
+                          );
+                        }}
+                      </Droppable>
                     </div>
                   </div>
-                ))}
-                
-                {/* Add Task to Section */}
-                <button className="w-full border-2 border-dashed border-gray-300 rounded-lg p-3 text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors text-sm">
-                  + Add task
-                </button>
-              </div>
+                );
+              })}
             </div>
-          </div>
-        ))}
-
-        {/* Add Section */}
-        <div className="flex-shrink-0 w-80">
-          <button className="w-full h-full min-h-[200px] border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors">
-            <div className="text-center">
-              <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add Section</span>
-            </div>
-          </button>
+          </DragDropContext>
         </div>
-      </div>
-    </div>
-  );
+        {isAddTaskModalOpen && (
+          <TaskModal
+            projectId={projectId}
+            sectionId={sections.length > 0 ? sections[0].id : undefined}
+            onClose={() => setIsAddTaskModalOpen(false)}
+            onSave={() => {
+              fetchProject(); // Refresh tasks after save
+            }}
+          />
+        )}
+      </>
+    );
+  )}
 };
 
 export default ProjectBoard;

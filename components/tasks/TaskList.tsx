@@ -41,7 +41,7 @@ export default function TaskList() {
         return (
           task.title.toLowerCase().includes(query) ||
           task.description?.toLowerCase().includes(query) ||
-          task.project.name.toLowerCase().includes(query)
+          task.project?.name?.toLowerCase().includes(query)
         )
       }
       return true

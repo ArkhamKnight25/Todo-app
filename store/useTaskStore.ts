@@ -109,30 +109,36 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   
   createTask: async (taskData) => {
     try {
-      const token = localStorage.getItem('accessToken')
+      const token = localStorage.getItem('accessToken');
+      let ownerId = undefined;
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          ownerId = payload.userId;
+        } catch {}
+      }
+      const fullTaskData = { ...taskData, ownerId };
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(taskData),
-      })
-      
+        body: JSON.stringify(fullTaskData),
+      });
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create task')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create task');
       }
-      
-      const task = await response.json()
+      const task = await response.json();
       set(state => ({ 
         tasks: [...state.tasks, task],
         error: null 
-      }))
-      return task
+      }));
+      return task;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to create task' })
-      return null
+      set({ error: error instanceof Error ? error.message : 'Failed to create task' });
+      return null;
     }
   },
   

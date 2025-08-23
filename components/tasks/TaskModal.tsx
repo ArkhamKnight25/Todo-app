@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { X, Calendar, Flag, User, Tag, AlignLeft, Clock } from 'lucide-react'
-import { useTaskStore, Task } from '../../store/useTaskStore'
+import { Task } from '../../store/useTaskStore'
+import { updateTaskAction, createTaskAction } from '../../task-actions';
 
 const taskSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255, 'Title too long'),
@@ -15,20 +17,23 @@ const taskSchema = z.object({
   dueDate: z.string().optional(),
   projectId: z.string().optional(),
   assigneeId: z.string().optional(),
+  sectionId: z.string().optional(),
 })
 
 type TaskFormData = z.infer<typeof taskSchema>
 
 interface TaskModalProps {
   task?: Task | null
+  projectId?: string
+  sectionId?: string
   onClose: () => void
   onSave: () => void
 }
 
-export default function TaskModal({ task, onClose, onSave }: TaskModalProps) {
-  const { createTask, updateTask, isLoading } = useTaskStore()
+export default function TaskModal({ task, onClose, onSave, projectId, sectionId }: TaskModalProps) {
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   const {
     register,
     handleSubmit,
@@ -44,8 +49,9 @@ export default function TaskModal({ task, onClose, onSave }: TaskModalProps) {
       priority: 'MEDIUM',
       status: 'TODO',
       dueDate: '',
-      projectId: '',
+      projectId: projectId || '',
       assigneeId: '',
+      sectionId: sectionId || ''
     }
   })
   
@@ -67,35 +73,43 @@ export default function TaskModal({ task, onClose, onSave }: TaskModalProps) {
   const onSubmit = async (data: TaskFormData) => {
     setIsSubmitting(true)
     try {
+      // Get ownerId from access token
+      let ownerId = undefined;
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          ownerId = payload.userId;
+        } catch {}
+      }
+
       const taskData: any = {
+        projectId: data.projectId?.trim() || undefined,
+        sectionId: data.sectionId?.trim() || undefined,
         title: data.title,
         description: data.description,
         priority: data.priority,
         status: data.status,
         dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
-      }
-      
-      // Only include assigneeId if it's not empty
-      if (data.assigneeId && data.assigneeId.trim() !== '') {
-        taskData.assigneeId = data.assigneeId
-      }
-      
-      // Only include projectId if it's not empty
-      if (data.projectId && data.projectId.trim() !== '') {
-        taskData.projectId = data.projectId
-      }
-      
+        assigneeId: data.assigneeId?.trim() || undefined,
+        ownerId,
+      };
+
+      console.log("project ID "+ data.projectId);
+      console.log("section ID "+ data.sectionId);
+      console.log("owner ID "+ ownerId);
+
       if (task) {
-        await updateTask(task.id, taskData)
+        await updateTaskAction(task.id, taskData);
       } else {
-        await createTask(taskData)
+        await createTaskAction(taskData);
       }
-      
-      onSave()
+
+      onSave();
     } catch (error) {
-      console.error('Failed to save task:', error)
+      console.error('Failed to save task:', error);
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
   
@@ -268,7 +282,7 @@ export default function TaskModal({ task, onClose, onSave }: TaskModalProps) {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || isLoading}
+              disabled={isSubmitting}
               className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? 'Saving...' : task ? 'Update Task' : 'Create Task'}

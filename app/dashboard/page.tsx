@@ -7,6 +7,7 @@ import TaskList from '../../components/tasks/TaskList'
 import { ProjectList } from '../../components/projects'
 import ThemeToggle from '../../components/ui/ThemeToggle'
 import { useDashboardData } from '../../lib/hooks/useDashboardData'
+import CalendarModal from '../../components/ui/Calendar'
 
 type ViewMode = 'overview' | 'tasks' | 'projects'
 
@@ -192,10 +193,10 @@ export default function Dashboard() {
                   <Plus className="h-5 w-5 mr-2 text-gray-400" />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">New Project</span>
                 </button>
-                <button className="flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
-                  <Calendar className="h-5 w-5 mr-2 text-gray-400" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">View Calendar</span>
-                </button>
+                {/* Calendar modal button */}
+                <div>
+                  <CalendarModal />
+                </div>
                 <button className="flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
                   <TrendingUp className="h-5 w-5 mr-2 text-gray-400" />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Analytics</span>
@@ -238,7 +239,7 @@ export default function Dashboard() {
                 </div>
               ) : recentActivity.length > 0 ? (
                 <div className="space-y-4">
-                  {recentActivity.map((activity) => (
+                  {recentActivity.map((activity: any) => (
                     <div key={activity.id} className="flex items-center space-x-3">
                       <div className="flex-shrink-0">
                         {activity.icon === 'check' && <CheckCircle className="h-5 w-5 text-green-600" />}
