@@ -13,7 +13,6 @@ type ViewMode = 'overview' | 'tasks' | 'projects'
 
 export default function Dashboard() {
   const router = useRouter()
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentView, setCurrentView] = useState<ViewMode>('overview')
   const { stats, recentActivity, loading: dashboardLoading, error: dashboardError, refresh } = useDashboardData()
@@ -34,9 +33,6 @@ export default function Dashboard() {
       return
     }
 
-    // TODO: Verify token and get user data
-    // For now, just simulate user data
-    setUser({ name: 'User', email: 'user@example.com' })
     setLoading(false)
   }, [router])
 

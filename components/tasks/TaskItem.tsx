@@ -1,21 +1,13 @@
 'use client'
 
 import React from 'react'
-import { Edit, Check, Clock, Calendar, Flag, User } from 'lucide-react'
+import { Edit, Check, Calendar, User } from 'lucide-react'
+import type { Task } from '@/store/useTaskStore'
 
 interface TaskItemProps {
-  task: {
-    id: string
-    title: string
-    description?: string | null
-    status: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'COMPLETED' | 'ARCHIVED'
-    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
-    dueDate?: string | null
-    project?: { name: string; color: string } | null
-    assignee?: { id: string; name: string | null; avatar: string | null } | null
-  }
+  task: Task
   onComplete: (id: string, completed: boolean) => void
-  onEdit: (task: any) => void
+  onEdit: (task: Task) => void
 }
 
 export default function TaskItem({ task, onComplete, onEdit }: TaskItemProps) {

@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useTaskStore } from '../../store/useTaskStore'
+import type { Task } from '../../store/useTaskStore'
 import TaskItem from './TaskItem'
 import TaskModal from './TaskModal'
 import { Plus, Filter, Search, SortAsc } from 'lucide-react'
 
-type ViewMode = 'list' | 'board' | 'calendar'
 type FilterBy = 'all' | 'today' | 'overdue' | 'completed' | 'my-tasks'
 type SortBy = 'created' | 'due-date' | 'priority' | 'alphabetical'
 
@@ -16,16 +16,14 @@ export default function TaskList() {
     isLoading, 
     error, 
     fetchTasks, 
-    updateTask, 
     completeTask 
   } = useTaskStore()
   
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingTask, setEditingTask] = useState(null)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterBy, setFilterBy] = useState<FilterBy>('all')
   const [sortBy, setSortBy] = useState<SortBy>('created')
-  const [viewMode] = useState<ViewMode>('list')
   
   // Load tasks on component mount
   useEffect(() => {
@@ -87,7 +85,7 @@ export default function TaskList() {
     setIsModalOpen(true)
   }
   
-  const handleEditTask = (task: any) => {
+  const handleEditTask = (task: Task) => {
     setEditingTask(task)
     setIsModalOpen(true)
   }

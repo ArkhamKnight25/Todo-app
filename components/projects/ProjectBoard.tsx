@@ -1,428 +1,489 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Project, Section, Task } from '@/types';
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  PointerSensor,
+  closestCorners,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { Plus } from 'lucide-react'
+import TaskModal from '@/components/tasks/TaskModal'
+import type { Project, Section, Task, TaskPriority, TaskStatus } from '@/types'
 
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';import TaskModal from '@/components/tasks/TaskModal';
 interface ProjectBoardProps {
-  projectId: string;
+  projectId: string
 }
 
-const ProjectBoard: React.FC<ProjectBoardProps> = ({ projectId }) => {
-  const router = useRouter();
-  const [project, setProject] = useState<Project | null>(null);
-  const [sections, setSections] = useState<Section[]>([]); // Keep for possible future use
-  const [newSectionName, setNewSectionName] = useState(''); // Keep for possible future use
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
+const STATUSES: Array<{ key: TaskStatus; label: string }> = [
+  { key: 'TODO', label: 'To Do' },
+  { key: 'IN_PROGRESS', label: 'In Progress' },
+  { key: 'REVIEW', label: 'Review' },
+  { key: 'COMPLETED', label: 'Completed' },
+  { key: 'ARCHIVED', label: 'Archived' },
+]
 
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
-
-  if (!isHydrated) return null;
-
-  useEffect(() => {
-    fetchProject();
-  }, [projectId]);
-
-  const fetchProject = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const token = localStorage.getItem('accessToken');
-      console.log('DEBUG: token', token);
-      console.log('DEBUG: projectId', projectId);
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-      if (!projectId || typeof projectId !== 'string' || projectId.trim() === '') {
-        setError('Invalid project ID');
-        setLoading(false);
-        return;
-      }
-
-      // Fetch project details
-      const projectResponse = await fetch(`/api/projects/${projectId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (projectResponse.status === 401) {
-        // Token invalid or expired
-        localStorage.removeItem('accessToken');
-        router.push('/login');
-        return;
-      }
-
-      if (!projectResponse.ok) {
-        let errorMsg = 'Failed to fetch project';
-        try {
-          const errorData = await projectResponse.json();
-          errorMsg = errorData.error || errorMsg;
-        } catch {}
-        setError(errorMsg);
-        setLoading(false);
-        return;
-      }
-
-      const projectData = await projectResponse.json();
-      setProject(projectData.project);
-
-
-      // Fetch sections (with tasks)
-      const sectionsResponse = await fetch(`/api/projects/${projectId}/sections`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!sectionsResponse.ok) {
-        throw new Error('Failed to fetch sections');
-      }
-
-      const sectionsData = await sectionsResponse.json();
-      setSections(sectionsData.sections || []);
-
-      // Gather all tasks from sections
-      const allTasks: Task[] = [];
-      sectionsData.sections?.forEach((section: Section) => {
-        section.tasks?.forEach((task: Task) => {
-          allTasks.push(task);
-        });
-      });
-      setTasks(allTasks);
-
-
-
-
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch project');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusBadgeColor = (status: Task['status']) => {
-    switch (status) {
-      case 'TODO':
-        return 'bg-gray-100 text-gray-800';
-      case 'IN_PROGRESS':
-        return 'bg-blue-100 text-blue-800';
-      case 'REVIEW':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'COMPLETED':
-        return 'bg-green-100 text-green-800';
-      case 'ARCHIVED':
-        return 'bg-gray-100 text-gray-500';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityColor = (priority: Task['priority']) => {
-    switch (priority) {
-      case 'LOW':
-        return 'border-l-green-400';
-      case 'MEDIUM':
-        return 'border-l-yellow-400';
-      case 'HIGH':
-        return 'border-l-orange-400';
-      case 'URGENT':
-        return 'border-l-red-400';
-      default:
-        return 'border-l-gray-400';
-    }
-  };
-
-
-  const onDragEnd = async (result: any) => {
-    const { destination, source, draggableId } = result;
-
-    if (!destination) return;
-    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
-
-    setDraggedTaskId(draggableId);
-    const taskId = draggableId;
-    const sourceStatus = source.droppableId;
-    const destStatus = destination.droppableId;
-
-    const originalTasks = [...tasks];
-
-    try {
-      // If moving within the same status column, reorder
-      if (sourceStatus === destStatus) {
-        const statusTasks = tasks.filter((task) => task.status === sourceStatus);
-        const otherTasks = tasks.filter((task) => task.status !== sourceStatus);
-        const movedTask = statusTasks[source.index];
-        const newStatusTasks = Array.from(statusTasks);
-        newStatusTasks.splice(source.index, 1);
-        newStatusTasks.splice(destination.index, 0, movedTask);
-        setTasks([...otherTasks, ...newStatusTasks]);
-      } else {
-        // If moving to a different status, update status and move to new column
-        setTasks((prevTasks) => {
-          const updatedTasks = prevTasks.map((task) =>
-            task.id === taskId ? { ...task, status: destStatus } : task
-          );
-          // Reorder in new column
-          const destTasks = updatedTasks.filter((task) => task.status === destStatus);
-          const otherTasks = updatedTasks.filter((task) => task.status !== destStatus);
-          const movedTask = updatedTasks.find((task) => task.id === taskId);
-          let newDestTasks = Array.from(destTasks);
-          // Remove the moved task from its old position if present
-          newDestTasks = newDestTasks.filter((task) => task.id !== taskId);
-          // Insert at the new index
-          if (movedTask) newDestTasks.splice(destination.index, 0, movedTask);
-          return [...otherTasks, ...newDestTasks];
-        });
-      }
-    } catch (error) {
-      console.error("Failed to reorder tasks:", error);
-      setTasks(originalTasks);
-      setError("Failed to reorder tasks. Reverting changes.");
-    } finally {
-      setDraggedTaskId(null);
-      // Optionally, persist order to backend here
-    }
-  };
-
-  const handleCreateSection = async () => {
-    if (!newSectionName.trim()) {
-      alert("Section name cannot be empty");
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-
-      const response = await fetch(`/api/projects/${projectId}/sections`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: newSectionName }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create section');
-      }
-      setNewSectionName('');
-      fetchProject(); // Refresh project data
-    } catch (error) {
-      console.error("Section creation error:", error);
-      setError("Failed to create section.");
-    }
-  };
-
-  const handleAddTaskClick = () => {
-    setIsAddTaskModalOpen(true);
-  };
-
-  if (loading) {
-    if (!isHydrated) return null;
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
+function priorityBorder(priority: TaskPriority) {
+  switch (priority) {
+    case 'LOW':
+      return 'border-l-emerald-400'
+    case 'MEDIUM':
+      return 'border-l-sky-400'
+    case 'HIGH':
+      return 'border-l-amber-400'
+    case 'URGENT':
+      return 'border-l-rose-500'
+    default:
+      return 'border-l-gray-300'
   }
+}
 
+function statusTone(status: TaskStatus) {
+  switch (status) {
+    case 'TODO':
+      return 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+    case 'IN_PROGRESS':
+      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+    case 'REVIEW':
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+    case 'COMPLETED':
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+    case 'ARCHIVED':
+      return 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+    default:
+      return 'bg-slate-100 text-slate-700'
+  }
+}
 
-  if (error) {
-    if (!isHydrated) return null;
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <div className="flex">
-          <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div className="ml-3">
-            <p className="text-red-800">{error}</p>
-            <button
-              onClick={fetchProject}
-              className="mt-2 text-red-600 hover:text-red-500 font-medium"
-            >
-              Try again
-            </button>
-          </div>
+function SortableTaskCard({ task }: { task: Task }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      {...attributes}
+      {...listeners}
+      className={`cursor-grab rounded-xl border border-gray-200 border-l-4 bg-white p-4 shadow-sm transition active:cursor-grabbing dark:border-gray-700 dark:bg-gray-900 ${
+        priorityBorder(task.priority)
+      } ${isDragging ? 'opacity-40' : ''}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{task.title}</h3>
+          {task.description && (
+            <p className="mt-2 line-clamp-3 text-xs text-gray-600 dark:text-gray-400">{task.description}</p>
+          )}
+        </div>
+        <span className={`rounded-full px-2 py-1 text-[10px] font-medium ${statusTone(task.status)}`}>
+          {task.priority}
+        </span>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex items-center gap-2">
+          {task.assignee && (
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-[10px] font-semibold text-white">
+              {(task.assignee.name || task.assignee.email || '?').slice(0, 1).toUpperCase()}
+            </span>
+          )}
+          {task.dueDate && <span>{new Date(task.dueDate).toLocaleDateString()}</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {task._count.comments > 0 && <span>{task._count.comments} comments</span>}
+          {task._count.attachments > 0 && <span>{task._count.attachments} files</span>}
         </div>
       </div>
-    );
+    </div>
+  )
+}
+
+function TaskCardOverlay({ task }: { task: Task }) {
+  return (
+    <div
+      className={`rounded-xl border border-gray-200 border-l-4 bg-white p-4 shadow-lg ring-2 ring-blue-300/60 dark:border-gray-700 dark:bg-gray-900 ${
+        priorityBorder(task.priority)
+      }`}
+    >
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{task.title}</h3>
+      {task.description && (
+        <p className="mt-2 line-clamp-3 text-xs text-gray-600 dark:text-gray-400">{task.description}</p>
+      )}
+    </div>
+  )
+}
+
+function BoardColumn({
+  status,
+  tasks,
+  onAddTask,
+}: {
+  status: { key: TaskStatus; label: string }
+  tasks: Task[]
+  onAddTask: (status: TaskStatus) => void
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: status.key,
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`w-80 flex-shrink-0 rounded-2xl border p-4 transition-colors dark:border-gray-700 ${
+        isOver ? 'border-blue-400 bg-blue-50/80 dark:bg-blue-950/30' : 'border-gray-200 bg-gray-50/70 dark:bg-gray-800/80'
+      }`}
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{status.label}</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{tasks.length} tasks</p>
+        </div>
+        <button
+          onClick={() => onAddTask(status.key)}
+          className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-white hover:text-blue-600 dark:hover:bg-gray-700"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+
+      <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-3">
+          {tasks.map((task) => (
+            <SortableTaskCard key={task.id} task={task} />
+          ))}
+          <button
+            onClick={() => onAddTask(status.key)}
+            className="flex w-full items-center justify-center rounded-xl border-2 border-dashed border-gray-300 px-3 py-3 text-sm text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-600 dark:text-gray-400"
+          >
+            Add task
+          </button>
+        </div>
+      </SortableContext>
+    </div>
+  )
+}
+
+export default function ProjectBoard({ projectId }: ProjectBoardProps) {
+  const router = useRouter()
+  const [project, setProject] = useState<Project | null>(null)
+  const [sections, setSections] = useState<Section[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+  const [createStatus, setCreateStatus] = useState<TaskStatus>('TODO')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  const firstSectionId = sections[0]?.id
+
+  const columnTasks = useMemo(
+    () =>
+      STATUSES.reduce<Record<TaskStatus, Task[]>>(
+        (acc, status) => {
+          acc[status.key] = tasks
+            .filter((task) => task.status === status.key)
+            .sort((a, b) => a.order - b.order || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+          return acc
+        },
+        {
+          TODO: [],
+          IN_PROGRESS: [],
+          REVIEW: [],
+          COMPLETED: [],
+          ARCHIVED: [],
+        }
+      ),
+    [tasks]
+  )
+
+  const fetchBoard = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const token = localStorage.getItem('accessToken')
+
+      if (!token) {
+        router.push('/login')
+        return
+      }
+
+      const [projectResponse, sectionsResponse] = await Promise.all([
+        fetch(`/api/projects/${projectId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`/api/projects/${projectId}/sections`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ])
+
+      if (projectResponse.status === 401 || sectionsResponse.status === 401) {
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        router.push('/login?expired=true')
+        return
+      }
+
+      if (!projectResponse.ok || !sectionsResponse.ok) {
+        const projectError = await projectResponse.json().catch(() => ({}))
+        const sectionsError = await sectionsResponse.json().catch(() => ({}))
+        throw new Error(projectError.error || sectionsError.error || 'Failed to load project board')
+      }
+
+      const projectData = await projectResponse.json()
+      const sectionsData = await sectionsResponse.json()
+      const nextSections = sectionsData.sections || []
+
+      setProject(projectData.project)
+      setSections(nextSections)
+      setTasks(nextSections.flatMap((section: Section) => section.tasks || []))
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to load project board')
+    } finally {
+      setLoading(false)
+    }
+  }, [projectId, router])
+
+  useEffect(() => {
+    fetchBoard()
+  }, [fetchBoard])
+
+  const openCreateTask = (status: TaskStatus) => {
+    setCreateStatus(status)
+    setIsTaskModalOpen(true)
+  }
+
+  const persistBoard = async (nextTasks: Task[]) => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+
+    const updates = STATUSES.flatMap((status) =>
+      nextTasks
+        .filter((task) => task.status === status.key)
+        .sort((a, b) => a.order - b.order)
+        .map((task, index) =>
+          fetch(`/api/tasks/${task.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              status: status.key,
+              order: index,
+              sectionId: task.sectionId || firstSectionId || null,
+              completedAt: status.key === 'COMPLETED' ? task.completedAt || new Date().toISOString() : null,
+            }),
+          })
+        )
+    )
+
+    const responses = await Promise.all(updates)
+    if (responses.some((response) => !response.ok)) {
+      throw new Error('Failed to save board changes')
+    }
+  }
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = tasks.find((item) => item.id === String(event.active.id)) || null
+    setActiveTask(task)
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveTask(null)
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const activeTaskItem = tasks.find((task) => task.id === String(active.id))
+    if (!activeTaskItem) {
+      return
+    }
+
+    const overTaskItem = tasks.find((task) => task.id === String(over.id))
+    const destinationStatus =
+      overTaskItem?.status ||
+      (STATUSES.some((item) => item.key === over.id) ? (over.id as TaskStatus) : activeTaskItem.status)
+
+    const sourceColumn = columnTasks[activeTaskItem.status]
+    const destinationColumn = columnTasks[destinationStatus]
+    const sourceIndex = sourceColumn.findIndex((task) => task.id === activeTaskItem.id)
+    const destinationIndex = overTaskItem
+      ? destinationColumn.findIndex((task) => task.id === overTaskItem.id)
+      : destinationColumn.length
+
+    let nextTasks = [...tasks]
+
+    if (activeTaskItem.status === destinationStatus) {
+      const reordered = arrayMove(sourceColumn, sourceIndex, destinationIndex).map((task, index) => ({
+        ...task,
+        order: index,
+      }))
+
+      nextTasks = nextTasks.map((task) => reordered.find((item) => item.id === task.id) || task)
+    } else {
+      const updatedActiveTask = {
+        ...activeTaskItem,
+        status: destinationStatus,
+        sectionId: activeTaskItem.sectionId || firstSectionId || null,
+        completedAt: destinationStatus === 'COMPLETED' ? new Date().toISOString() : null,
+      }
+
+      const sourceWithoutActive = sourceColumn.filter((task) => task.id !== activeTaskItem.id).map((task, index) => ({
+        ...task,
+        order: index,
+      }))
+      const destinationWithoutActive = destinationColumn.filter((task) => task.id !== activeTaskItem.id)
+      const reorderedDestination = [
+        ...destinationWithoutActive.slice(0, destinationIndex),
+        updatedActiveTask,
+        ...destinationWithoutActive.slice(destinationIndex),
+      ].map((task, index) => ({
+        ...task,
+        order: index,
+      }))
+
+      nextTasks = nextTasks
+        .filter((task) => task.id !== activeTaskItem.id && task.status !== activeTaskItem.status && task.status !== destinationStatus)
+        .concat(sourceWithoutActive, reorderedDestination)
+    }
+
+    setTasks(nextTasks)
+
+    try {
+      await persistBoard(nextTasks)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to save board changes')
+      fetchBoard()
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-blue-600" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+        <p className="font-medium">{error}</p>
+        <button onClick={fetchBoard} className="mt-3 text-sm font-medium underline">
+          Try again
+        </button>
+      </div>
+    )
   }
 
   if (!project) {
-    if (!isHydrated) return null;
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Project not found</p>
-      </div>
-    );
+    return <div className="py-12 text-center text-gray-500 dark:text-gray-400">Project not found.</div>
   }
 
-
-
   return (
-    return (
-      <>
-        <div className="space-y-6 relative">
-          {/* Project Header */}
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between">
-            <div className="flex items-center space-x-3">
+    <>
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-4">
               <div
-                className="w-4 h-4 rounded-full"
+                className="flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-semibold text-white"
                 style={{ backgroundColor: project.color }}
-              />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
-                {project.description && (
-                  <p className="text-gray-600">{project.description}</p>
-                )}
+              >
+                {project.icon?.slice(0, 2) || project.name.slice(0, 1).toUpperCase()}
               </div>
-              {project.icon && (
-                <span className="text-2xl">{project.icon}</span>
-              )}
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{project.name}</h1>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  {project.description || 'No description yet.'}
+                </p>
+                <p className="mt-2 text-xs uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
+                  {sections.length} sections available
+                </p>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <button onClick={handleAddTaskClick} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                Add Task
-              </button>
-            </div>
+            <button
+              onClick={() => openCreateTask('TODO')}
+              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Task
+            </button>
           </div>
-          {/* Group tasks by status */}
-          <DragDropContext onDragEnd={onDragEnd}>
-            <div className="flex space-x-6 overflow-x-auto pb-6">
-              {['TODO', 'IN_PROGRESS', 'REVIEW', 'COMPLETED', 'ARCHIVED'].map((status) => {
-                const statusTasks = tasks
-                  .filter((task) => task.status === status)
-                  .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-                return (
-                  <div key={status} className="flex-shrink-0 w-80">
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                      {/* Status Header */}
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{status.replace('_', ' ')}</h3>
-                        <span className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-2 py-1 rounded-full">
-                          {statusTasks.length}
-                        </span>
-                      </div>
-                      {/* Tasks for this status */}
-                      <Droppable droppableId={status}>
-                        {(provided) => {
-                          // Use default parameters instead of defaultProps
-                          return (
-                            <div className="space-y-3" ref={provided.innerRef} {...provided.droppableProps}>
-                              {statusTasks.map((task, index) => (
-                                <Draggable key={task.id} draggableId={task.id} index={index}>
-                                  {(provided) => {
-                                    // Use default parameters instead of defaultProps
-                                    return (
-                                      <div
-                                        key={task.id}
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        className={`bg-white dark:bg-gray-900 rounded-lg p-3 border-l-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer
-                                          ${getPriorityColor(task.priority)}
-                                          ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
-                                      >
-                                        <div className="flex items-start justify-between mb-2">
-                                          <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm">{task.title}</h4>
-                                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadgeColor(task.status)} dark:text-gray-100`}>
-                                            {task.status.replace('_', ' ')}
-                                          </span>
-                                        </div>
-                                        {task.description && (
-                                          <p className="text-gray-600 dark:text-gray-300 text-xs mb-2 line-clamp-2">{task.description}</p>
-                                        )}
-                                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                                          <div className="flex items-center space-x-2">
-                                            {task.assignee && (
-                                              <div className="flex items-center space-x-1">
-                                                <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">
-                                                  {task.assignee.name?.[0] || task.assignee.email[0]}
-                                                </div>
-                                              </div>
-                                            )}
-                                            {task.dueDate && (
-                                              <span>
-                                                Due {new Date(task.dueDate).toLocaleDateString()}
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div className="flex items-center space-x-1">
-                                            {task._count && (
-                                              <>
-                                                {task._count.comments > 0 && (
-                                                  <span className="flex items-center space-x-1">
-                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                                    </svg>
-                                                    <span>{task._count.comments}</span>
-                                                  </span>
-                                                )}
-                                                {task._count.attachments > 0 && (
-                                                  <span className="flex items-center space-x-1">
-                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                                    </svg>
-                                                    <span>{task._count.attachments}</span>
-                                                  </span>
-                                                )}
-                                              </>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  }}
-                                </Draggable>
-                              ))}
-                              {/* Add Task to Status */}
-                              <button onClick={handleAddTaskClick} className="w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors text-sm">
-                                + Add Task
-                              </button>
-                              {provided.placeholder}
-                            </div>
-                          );
-                        }}
-                      </Droppable>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </DragDropContext>
         </div>
-        {isAddTaskModalOpen && (
-          <TaskModal
-            projectId={projectId}
-            sectionId={sections.length > 0 ? sections[0].id : undefined}
-            onClose={() => setIsAddTaskModalOpen(false)}
-            onSave={() => {
-              fetchProject(); // Refresh tasks after save
-            }}
-          />
-        )}
-      </>
-    );
-  )}
-};
 
-export default ProjectBoard;
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-5 overflow-x-auto pb-4">
+            {STATUSES.map((status) => (
+              <BoardColumn
+                key={status.key}
+                status={status}
+                tasks={columnTasks[status.key]}
+                onAddTask={openCreateTask}
+              />
+            ))}
+          </div>
+          <DragOverlay>{activeTask ? <TaskCardOverlay task={activeTask} /> : null}</DragOverlay>
+        </DndContext>
+      </div>
+
+      {isTaskModalOpen && (
+        <TaskModal
+          projectId={projectId}
+          sectionId={firstSectionId}
+          onClose={() => setIsTaskModalOpen(false)}
+          onSave={() => {
+            setIsTaskModalOpen(false)
+            fetchBoard()
+          }}
+          task={{
+            id: '',
+            title: '',
+            description: '',
+            status: createStatus,
+            priority: 'MEDIUM',
+            dueDate: null,
+            order: 0,
+            projectId,
+            sectionId: firstSectionId || null,
+            ownerId: '',
+            assigneeId: null,
+            completedAt: null,
+            createdAt: '',
+            updatedAt: '',
+            owner: { id: '', name: null },
+            assignee: null,
+            project,
+            section: firstSectionId ? { id: firstSectionId, name: sections[0]?.name || 'Backlog', order: 0 } : null,
+            subtasks: [],
+            tags: [],
+            _count: { comments: 0, subtasks: 0, attachments: 0 },
+          }}
+        />
+      )}
+    </>
+  )
+}

@@ -6,7 +6,6 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
-import { useTheme } from '@/lib/contexts/ThemeContext'
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -17,7 +16,6 @@ type LoginForm = z.infer<typeof loginSchema>
 
 export default function LoginPage() {
   const router = useRouter()
-  const { theme } = useTheme()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)

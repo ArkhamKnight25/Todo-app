@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth/password'
 import { generateAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth/jwt'
+import { ensureDefaultProjectForWorkspace, ensureWorkspaceForUser } from '@/lib/data/defaults'
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -36,6 +37,9 @@ export async function POST(req: NextRequest) {
         name,
       },
     })
+
+    const workspace = await ensureWorkspaceForUser(user.id, user.name)
+    await ensureDefaultProjectForWorkspace(workspace.id)
     
     // Generate tokens
     const tokenPayload = { userId: user.id, email: user.email }
