@@ -1,12 +1,12 @@
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-slate-900">
       <div className="container mx-auto px-4 py-16">
         <div className="text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-gray-100 mb-6">
             Welcome to <span className="text-indigo-600">TaskFlow</span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
             A modern, collaborative task management application inspired by Asana. 
             Organize your work, track progress, and achieve your goals.
           </p>
@@ -19,7 +19,7 @@ export default function HomePage() {
             </a>
             <a
               href="/register"
-              className="inline-block border border-indigo-600 text-indigo-600 px-8 py-3 rounded-lg font-semibold hover:bg-indigo-50 transition-colors"
+              className="inline-block border border-indigo-600 text-indigo-600 dark:text-indigo-300 px-8 py-3 rounded-lg font-semibold hover:bg-indigo-50 dark:hover:bg-white/5 transition-colors"
             >
               Get Started
             </a>
